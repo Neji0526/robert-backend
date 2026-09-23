@@ -1,0 +1,47 @@
+# Local Postgres for the app (host port 5434) and the tests (host port 5433).
+# SQL in db/ is applied only when a database volume is created for the first time.
+# Tests then rebuild the test database themselves.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: shop
+      POSTGRES_PASSWORD: shop
+      POSTGRES_DB: shop
+    ports:
+      # 5434 on the host, so this does not collide with a local Postgres on 5432.
+      - "5434:5432"
+    volumes:
+      - shop-data:/var/lib/postgresql/data
+      - ./db/001_base_schema.sql:/docker-entrypoint-initdb.d/001_base_schema.sql:ro
+      - ./db/002_payments.sql:/docker-entrypoint-initdb.d/002_payments.sql:ro
+      - ./db/003_demo_payment_method.sql:/docker-entrypoint-initdb.d/003_demo_payment_method.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shop -d shop"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  test-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: shop
+      POSTGRES_PASSWORD: shop
+      POSTGRES_DB: shop_test
+    ports:
+      - "5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    volumes:
+      - ./db/001_base_schema.sql:/docker-entrypoint-initdb.d/001_base_schema.sql:ro
+      - ./db/002_payments.sql:/docker-entrypoint-initdb.d/002_payments.sql:ro
+      - ./db/003_demo_payment_method.sql:/docker-entrypoint-initdb.d/003_demo_payment_method.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shop -d shop_test"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  shop-data:
